@@ -29,38 +29,46 @@ the discovery and implementation work.
 ## Architecture
 
 Jira Ticket
-↓
-┌─────────────────────────────────────────────────────┐
-│                   LangGraph Pipeline                 │
-│                                                      │
-│  ┌──────────────────┐                               │
-│  │ Artifact Generator│  os.walk + Python AST        │
-│  │                  │  → tree.md                    │
-│  │                  │  → ast_map.md                 │
-│  │                  │  → file_table_map.md           │
-│  │                  │  → CLAUDE.md (via Claude API) │
-│  └────────┬─────────┘                               │
-│           ↓                                          │
-│  ┌──────────────────┐                               │
-│  │ Discovery Agent  │  Tool-calling agent           │
-│  │                  │  Tools: grep_repo, read_file  │
-│  │                  │  → discovery_summary          │
-│  └────────┬─────────┘                               │
-│           ↓                                          │
-│  ┌──────────────────┐                               │
-│  │   Plan Node      │  Structured output via        │
-│  │                  │  tool_use (submit_plan)       │
-│  │                  │  Pydantic validation          │
-│  │                  │  ← HITL approval gate →       │
-│  └────────┬─────────┘                               │
-│           ↓ (if approved)                            │
-│  ┌──────────────────┐                               │
-│  │ Developer Node   │  Atomic str_replace           │
-│  │                  │  Self-healing retry           │
-│  │                  │  git branch + commit          │
-│  └──────────────────┘                               │
-└─────────────────────────────────────────────────────┘
-↓
+     │
+     ▼
+┌────────────────────────────────────────┐
+│           LangGraph Pipeline           │
+│                                        │
+│  ┌─────────────────────────────────┐  │
+│  │      Artifact Generator         │  │
+│  │  os.walk + Python AST           │  │
+│  │  → tree.md                      │  │
+│  │  → ast_map.md                   │  │
+│  │  → file_table_map.md            │  │
+│  │  → CLAUDE.md (Claude API)       │  │
+│  └──────────────┬──────────────────┘  │
+│                 │                      │
+│                 ▼                      │
+│  ┌─────────────────────────────────┐  │
+│  │       Discovery Agent           │  │
+│  │  Tool-calling agent             │  │
+│  │  Tools: grep_repo, read_file    │  │
+│  │  → discovery_summary            │  │
+│  └──────────────┬──────────────────┘  │
+│                 │                      │
+│                 ▼                      │
+│  ┌─────────────────────────────────┐  │
+│  │         Plan Node               │  │
+│  │  Structured output (submit_plan)│  │
+│  │  Pydantic validation            │  │
+│  │  ← HITL approval gate →        │  │
+│  └──────────────┬──────────────────┘  │
+│                 │ (if approved)        │
+│                 ▼                      │
+│  ┌─────────────────────────────────┐  │
+│  │       Developer Node            │  │
+│  │  Atomic str_replace             │  │
+│  │  Self-healing retry             │  │
+│  │  git branch + commit            │  │
+│  └─────────────────────────────────┘  │
+└────────────────────────────────────────┘
+     │
+     ▼
 Git Branch + MR Description
 
 ---
@@ -111,36 +119,6 @@ Git Branch + MR Description
 - Conditional edge after plan — approved → developer, rejected → END
 - MemorySaver checkpointer for resumable workflows
 - `thread_id` enables replay from any checkpoint
-
----
-
-## Project Structure
-de_agent/
-├── main.py                    # entry point — runs the LangGraph pipeline
-├── graph.py                   # LangGraph graph definition
-├── state.py                   # AgentState TypedDict
-├── models.py                  # Pydantic models (Plan, FileChange, Change)
-│
-├── nodes/
-│   ├── artifact_generator.py  # os.walk + AST + CLAUDE.md generation
-│   ├── discovery.py           # tool-calling discovery agent
-│   ├── plan.py                # structured output + HITL
-│   └── developer.py          # str_replace + git operations
-│
-├── tools/
-│   ├── grep_tool.py           # grep_repo tool (@tool decorator)
-│   ├── read_file_tool.py      # read_file tool with line numbers
-│   └── context.py             # global repo_path injection
-│
-├── utils/
-│   ├── ast_parser.py          # AST extraction, file-table mapping
-│   └── git_utils.py           # branch, commit, diff, clone/pull
-│
-└── artifacts/                 # generated at runtime (gitignored)
-├── tree.md
-├── ast_map.md
-├── file_table_map.md
-└── CLAUDE.md
 
 ---
 
